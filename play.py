@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from utils import take_screenshot, prepare_image
 from utils import XboxController
 import tensorflow as tf
 import model
 from termcolor import cprint
+import wx
+from scipy import ndimage, misc
+import pickle
 
+import numpy as np
 PORT_NUMBER = 8082
 
 # Start session
@@ -28,10 +32,16 @@ class myHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         ## Look
         bmp = take_screenshot()
+        #image_file = 'sol/'+'img_tmp.png'
+        #bmp.SaveFile(image_file, wx.BITMAP_TYPE_PNG)
+        #image = ndimage.imread(image_file, mode="RGB")
+        #img = bmp.ConvertToImage()
         vec = prepare_image(bmp)
 
         ## Think
         joystick = model.y.eval(feed_dict={model.x: [vec], model.keep_prob: 1.0})[0]
+        joystick = np.append(joystick,[0])
+        print(joystick)
 
         ## Act
         ### manual override
@@ -39,6 +49,7 @@ class myHandler(BaseHTTPRequestHandler):
 
         if (manual_override):
             joystick = real_controller.read()
+            print(joystick)
             joystick[1] *= -1 # flip y (this is in the config when it runs normally)
 
         ### calibration
@@ -48,6 +59,7 @@ class myHandler(BaseHTTPRequestHandler):
             int(round(joystick[2])),
             int(round(joystick[3])),
             int(round(joystick[4])),
+            int(round(joystick[5])),
         ]
 
         ### print to console
@@ -60,11 +72,12 @@ class myHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(output)
+        data_string = pickle.dumps(output)
+        self.wfile.write(bytes(data_string))
         return
 
 
 if __name__ == '__main__':
     server = HTTPServer(('', PORT_NUMBER), myHandler)
-    print 'Started httpserver on port ' , PORT_NUMBER
+    print ('Started httpserver on port ' , PORT_NUMBER)
     server.serve_forever()

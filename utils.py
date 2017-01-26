@@ -12,9 +12,10 @@ from skimage.color import rgb2gray
 from skimage.transform import resize
 from skimage.io import imread
 
+from scipy import ndimage, misc
+
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-
 
 IMG_W = 200
 IMG_H = 66
@@ -26,15 +27,27 @@ def take_screenshot():
     bmp = wx.Bitmap(size[0], size[1])
     mem = wx.MemoryDC(bmp)
     mem.Blit(0, 0, size[0], size[1], screen, 0, 0)
-    return bmp.GetSubBitmap(wx.Rect([0,0],[615,480]))
+    return bmp
 
 
 def prepare_image(img):
     if(type(img) == wx._core.Bitmap):
-        buf = img.ConvertToImage().GetData()
+        buf = img.ConvertToImage()
+        buf = buf.Rescale(width=615,height=480)
+        buf = buf.GetData()
         img = np.frombuffer(buf, dtype='uint8')
+        #img = wx.ImageFromBitmap(img)
+        #buf = img.GetDataBuffer() # use img.GetAlphaBuffer() for alpha data
+        #img = nm.frombuffer(buf, dtype='uint8')
+        #print("----------------------------%s" % type(img))
+        #img = resize(img, [615, 480])
+    else:
+        img = misc.imresize(img, (615, 480))
 
-    img = img.reshape(480, 615, 3)
+    #print(type(img))
+    #img = img.Rescale(width=480,height=615)
+    #print(img.size)    
+    img = img.reshape(615, 480, 3)
     img = resize(img, [IMG_H, IMG_W])
 
     return img
@@ -47,7 +60,7 @@ class XboxController:
             self.joystick = pygame.joystick.Joystick(0)
             self.joystick.init()
         except:
-            print 'unable to connect to Xbox Controller'
+            print ( 'unable to connect to Xbox Controller')
 
 
     def read(self):
@@ -57,7 +70,8 @@ class XboxController:
         a = self.joystick.get_button(0)
         b = self.joystick.get_button(2) # b=1, x=2
         rb = self.joystick.get_button(5)
-        return [x, y, a, b, rb]
+        sta = self.joystick.get_button(7)
+        return [x, y, a, b, rb, sta]
 
 
     def manual_override(self):
@@ -109,7 +123,7 @@ def viewer(sample):
     for i in range(len(image_files)):
 
         # joystick
-        print i, " ", joystick_values[i,:]
+        print ( i, " ", joystick_values[i,:])
 
         # format data
         plotData.append( joystick_values[i,:] )
@@ -121,7 +135,7 @@ def viewer(sample):
         if (i % 3 == 0):
             plt.subplot(121)
             image_file = image_files[i]
-            img = mpimg.imread(image_file)
+            img = mpimg.imread(image_file[2:-1])
             plt.imshow(img)
 
         # plot
@@ -141,13 +155,13 @@ def viewer(sample):
 
 # prepare training data
 def prepare(samples):
-    print "Preparing data"
+    print ( "Preparing data")
 
     X = []
     y = []
 
     for sample in samples:
-        print sample
+        print ( sample)
 
         # load sample
         image_files, joystick_values = load_sample(sample)
@@ -157,18 +171,19 @@ def prepare(samples):
 
         # load, prepare and add images to X
         for image_file in image_files:
-            image = imread(image_file)
+            image = ndimage.imread(image_file[2:-1], mode="RGB")
+            #image = imread(image_file[2:-1])
             vec = prepare_image(image)
             X.append(vec)
 
-    print "Saving to file..."
+    print ( "Saving to file...")
     X = np.asarray(X)
     y = np.concatenate(y)
 
     np.save("data/X", X)
     np.save("data/y", y)
 
-    print "Done!"
+    print ( "Done!")
     return
 
 

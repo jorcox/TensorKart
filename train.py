@@ -36,4 +36,4 @@ for epoch in range(epochs):
 
 # Save the Model
 saver = tf.train.Saver()
-saver.save(sess, "model.ckpt")
+saver.save(sess, './model.ckpt')
